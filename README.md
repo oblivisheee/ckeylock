@@ -60,7 +60,5 @@ We welcome contributions! Feel free to submit issues or pull requests to help im
 
 ## License
 
-CKeyLock is licensed under the [MIT License](LICENSE).
+CKeyLock is licensed under the [Apache-2.0](LICENSE).
 
----
-Start securing your cryptographic keys with CKeyLock today!
