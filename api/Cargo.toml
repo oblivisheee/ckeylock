@@ -5,7 +5,7 @@ edition.workspace = true
 readme.workspace = true
 repository.workspace = true
 license.workspace = true
-
+description = "API for ckeylock."
 
 [dependencies]
 ckeylock-core = "0.1.1"
