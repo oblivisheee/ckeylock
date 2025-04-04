@@ -1,5 +1,5 @@
 [package]
-name = "api"
+name = "ckeylock-api"
 version.workspace = true
 edition.workspace = true
 readme.workspace = true
@@ -8,7 +8,7 @@ license.workspace = true
 
 
 [dependencies]
-ckeylock-core = { path = "../core" }
+ckeylock-core = "0.1.1"
 futures-util = "0.3.31"
 serde_json = "1.0.140"
 thiserror = "2.0.12"

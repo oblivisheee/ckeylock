@@ -62,18 +62,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "api"
-version = "0.1.1"
-dependencies = [
- "ckeylock-core",
- "futures-util",
- "serde_json",
- "thiserror",
- "tokio",
- "tokio-tungstenite",
-]
-
-[[package]]
 name = "autocfg"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -175,7 +163,7 @@ version = "0.1.1"
 dependencies = [
  "aes-gcm",
  "bincode",
- "ckeylock-core",
+ "ckeylock-core 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "cryptostream",
  "dashmap",
  "futures-util",
@@ -194,8 +182,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "ckeylock-api"
+version = "0.1.1"
+dependencies = [
+ "ckeylock-core 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures-util",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tokio-tungstenite",
+]
+
+[[package]]
 name = "ckeylock-core"
 version = "0.1.1"
+dependencies = [
+ "serde",
+ "serde_json",
+ "uuid",
+]
+
+[[package]]
+name = "ckeylock-core"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b308bfc9533745eb6f941baec30f0cf54b99fe401c7ed4a5aad1abf6a3a4ed59"
 dependencies = [
  "serde",
  "serde_json",
