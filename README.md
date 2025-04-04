@@ -22,7 +22,7 @@ To get started with CKeyLock, follow the instructions below:
     ```
 3. Build the project:
     ```bash
-    cargo build --release
+    cargo build --release -p ckeylock
     ```
 4. Create a config with name `Ckeylock.toml`. For example
     ```toml
