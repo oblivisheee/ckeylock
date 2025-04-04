@@ -1,0 +1,11 @@
+[workspace]
+members = [ "core","server"]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+readme = "README.md"
+repository = "https://github.com/oblivisheee/ckeylock"
+license = "Apache-2.0"
+license-file = "LICENSE"
