@@ -1,5 +1,5 @@
-// filepath: /Users/oblivisheee/Documents/Projects/ckeylock/core/src/response.rs
 use serde::{Deserialize, Serialize};
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ResponseStatus {
     Success,
@@ -9,59 +9,49 @@ pub enum ResponseStatus {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Response<T: ResponseTrait> {
-    pub status: ResponseStatus,
+pub struct Response {
+    message: String,
+    data: Option<ResponseData>,
+    reqid: Vec<u8>,
+}
+
+impl Response {
+    pub fn new(data: Option<ResponseData>, message: &str, reqid: Vec<u8>) -> Self {
+        Self {
+            message: message.to_string(),
+            data,
+            reqid,
+        }
+    }
+    pub fn data(&self) -> Option<&ResponseData> {
+        self.data.as_ref()
+    }
+    pub fn to_string(&self) -> String {
+        serde_json::to_string(self).unwrap()
+    }
+    pub fn reqid(&self) -> Vec<u8> {
+        self.reqid.clone()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ErrorResponse {
     pub message: String,
-    pub data: Option<T>,
+    pub reqid: Vec<u8>,
 }
-
-impl<T: ResponseTrait> Response<T> {
-    pub fn success(data: T, message: &str) -> Self {
-        Self {
-            status: ResponseStatus::Success,
-            message: message.to_string(),
-            data: Some(data),
-        }
-    }
-
-    pub fn error(message: &str) -> Self {
-        Self {
-            status: ResponseStatus::Error,
-            message: message.to_string(),
-            data: None,
-        }
-    }
-
-    pub fn not_found(message: &str) -> Self {
-        Self {
-            status: ResponseStatus::NotFound,
-            message: message.to_string(),
-            data: None,
-        }
+impl ErrorResponse {
+    pub fn to_string(&self) -> String {
+        serde_json::to_string(self).unwrap()
     }
 }
 
-pub struct SetResponse {
-    pub key: Vec<u8>,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ResponseData {
+    SetResponse { key: Vec<u8> },
+    GetResponse { value: Option<Vec<u8>> },
+    DeleteResponse { key: Option<Vec<u8>> },
+    ListResponse { keys: Vec<Vec<u8>> },
+    ExistsResponse { exists: bool },
+    CountResponse { count: usize },
+    ClearResponse,
 }
-
-pub struct GetResponse {
-    pub value: Vec<u8>,
-}
-
-pub struct DeleteResponse {
-    pub key: Vec<u8>,
-}
-pub struct ListResponse {
-    pub keys: Vec<Vec<u8>>,
-}
-pub struct ExistsResponse {
-    pub exists: bool,
-}
-pub struct CountResponse {
-    pub count: usize,
-}
-pub struct ClearResponse;
-pub struct PingResponse;
-
-pub trait ResponseTrait {}
