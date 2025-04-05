@@ -156,8 +156,8 @@ mod tests {
         let api = CKeyLockAPI::new("127.0.0.1:8080", Some("helloworld"));
         let mut connection = api.connect().await.unwrap();
 
-        let key = b"test_key".to_vec();
-        let value = b"test_value".to_vec();
+        let key = b"popa".to_vec();
+        let value = b"pisya".to_vec();
 
         let result = connection.set(key.clone(), value.clone()).await;
         assert!(result.is_ok());
@@ -216,7 +216,7 @@ mod tests {
     pub async fn req() {
         let api = CKeyLockAPI::new("127.0.0.1:8080", Some("helloworld"));
         let mut connection = api.connect().await.unwrap();
-        let key = b"test_key".to_vec();
+        let key = b"popa".to_vec();
         let res = connection.get(key.clone()).await.unwrap();
         println!("Response: {:?}", res.unwrap());
     }

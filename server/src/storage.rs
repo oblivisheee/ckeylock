@@ -8,7 +8,7 @@ use std::{
     path::Path,
 };
 use thiserror::Error;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, warn};
 
 pub struct Storage {
     data: DashMap<Vec<u8>, Vec<u8>>,
@@ -95,34 +95,34 @@ impl Storage {
     pub fn set(&mut self, key: Vec<u8>, value: Vec<u8>) -> Result<Vec<u8>, StorageError> {
         debug!(
             "Setting key: {:?} with value of length: {}",
-            key,
+            hex::encode(&key),
             value.len()
         );
         self.data.insert(key.clone(), value);
         self.sync()?;
-        info!("Key {:?} set successfully.", key);
+        info!("Key {:?} set successfully.", hex::encode(&key));
         Ok(key)
     }
 
     pub fn get(&self, key: Vec<u8>) -> Result<Option<Vec<u8>>, StorageError> {
-        debug!("Getting value for key: {:?}", key);
+        debug!("Getting value for key: {:?}", hex::encode(&key));
         let value = self.data.get(&key).map(|v| v.clone());
         if value.is_some() {
-            info!("Key {:?} found.", key);
+            info!("Key {:?} found.", hex::encode(&key));
         } else {
-            warn!("Key {:?} not found.", key);
+            warn!("Key {:?} not found.", hex::encode(&key));
         }
         Ok(value)
     }
 
     pub fn delete(&mut self, key: Vec<u8>) -> Result<Option<Vec<u8>>, StorageError> {
-        debug!("Deleting key: {:?}", key);
+        debug!("Deleting key: {:?}", hex::encode(&key));
         let value = self.data.remove(&key).map(|v| v.clone()).map(|(k, v)| k);
         self.sync()?;
         if value.is_some() {
-            info!("Key {:?} deleted successfully.", key);
+            info!("Key {:?} deleted successfully.", hex::encode(&key));
         } else {
-            warn!("Key {:?} not found for deletion.", key);
+            warn!("Key {:?} not found for deletion.", hex::encode(&key));
         }
         Ok(value)
     }
@@ -135,12 +135,12 @@ impl Storage {
     }
 
     pub fn exists(&self, key: Vec<u8>) -> Result<bool, StorageError> {
-        debug!("Checking existence of key: {:?}", key);
+        debug!("Checking existence of key: {:?}", hex::encode(&key));
         let exists = self.data.contains_key(&key);
         if exists {
-            info!("Key {:?} exists.", key);
+            info!("Key {:?} exists.", hex::encode(&key));
         } else {
-            warn!("Key {:?} does not exist.", key);
+            warn!("Key {:?} does not exist.", hex::encode(&key));
         }
         Ok(exists)
     }
