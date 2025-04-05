@@ -159,11 +159,11 @@ dependencies = [
 
 [[package]]
 name = "ckeylock"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "aes-gcm",
  "bincode",
- "ckeylock-core 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ckeylock-core 0.1.1",
  "cryptostream",
  "dashmap",
  "futures-util",
@@ -183,9 +183,9 @@ dependencies = [
 
 [[package]]
 name = "ckeylock-api"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
- "ckeylock-core 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ckeylock-core 0.1.1",
  "futures-util",
  "serde_json",
  "thiserror",
@@ -196,6 +196,8 @@ dependencies = [
 [[package]]
 name = "ckeylock-core"
 version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b308bfc9533745eb6f941baec30f0cf54b99fe401c7ed4a5aad1abf6a3a4ed59"
 dependencies = [
  "serde",
  "serde_json",
@@ -204,9 +206,7 @@ dependencies = [
 
 [[package]]
 name = "ckeylock-core"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b308bfc9533745eb6f941baec30f0cf54b99fe401c7ed4a5aad1abf6a3a4ed59"
+version = "0.1.2"
 dependencies = [
  "serde",
  "serde_json",
