@@ -12,19 +12,11 @@ CKeyLock is a secure and efficient tool written in Rust for managing and storing
 
 To get started with CKeyLock, follow the instructions below:
 
-1. Clone the repository:
+1. Install CkeyLock.
     ```bash
-    git clone https://github.com/oblivisheee/ckeylock.git
+    cargo install ckeylock
     ```
-2. Navigate to the project directory:
-    ```bash
-    cd ckeylock
-    ```
-3. Build the project:
-    ```bash
-    cargo build --release -p ckeylock
-    ```
-4. Create a config with name `Ckeylock.toml`. For example
+2. Create a config with name `Ckeylock.toml`. For example
     ```toml
     bind = "127.0.0.1:8080"
     password = "helloworld"
@@ -33,7 +25,7 @@ To get started with CKeyLock, follow the instructions below:
     ```
 4. Run the application:
     ```bash
-    ./target/release/ckeylock
+    ckeylock
     ```
 
 ## API

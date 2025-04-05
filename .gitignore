@@ -1,2 +1,4 @@
 /target
 *Ckeylock.toml
+*.DS_Store
+*dump-clok.bin
