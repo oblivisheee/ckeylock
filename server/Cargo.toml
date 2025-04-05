@@ -5,6 +5,7 @@ edition.workspace = true
 readme.workspace = true
 repository.workspace = true
 license.workspace = true
+description = "A secure and fast secret manager"
 
 [dependencies]
 aes-gcm = "0.10.3"
