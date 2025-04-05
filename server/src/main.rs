@@ -4,10 +4,18 @@ mod executor;
 mod storage;
 mod ws;
 
+use clap::Parser;
 use conf::Config;
 use crypto::hash;
 use storage::Storage;
 use ws::WsServer;
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+pub struct Args {
+    #[arg(short, long, default_value = CKEYLOCK_CONFIG_PATH)]
+    pub config: String,
+}
 
 const CKEYLOCK_CONFIG_PATH: &str = "Ckeylock.toml";
 
@@ -21,7 +29,9 @@ async fn main() {
         .with_file(true)
         .with_line_number(true)
         .init();
-    let conf = Config::from_toml(CKEYLOCK_CONFIG_PATH).unwrap_or_else(|e| {
+
+    let args = Args::parse();
+    let conf = Config::from_toml(&args.config).unwrap_or_else(|e| {
         panic!("Failed to load config: {}", e.to_string());
     });
     let key = hash(conf.dump_password.as_bytes());
