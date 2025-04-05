@@ -12,7 +12,7 @@ use ws::WsServer;
 const CKEYLOCK_CONFIG_PATH: &str = "Ckeylock.toml";
 
 #[tokio::main]
-async fn main() -> Result<(), Error> {
+async fn main() {
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::DEBUG)
         .with_target(false)
@@ -21,14 +21,20 @@ async fn main() -> Result<(), Error> {
         .with_file(true)
         .with_line_number(true)
         .init();
-    let conf = Config::from_toml(CKEYLOCK_CONFIG_PATH)?;
+    let conf = Config::from_toml(CKEYLOCK_CONFIG_PATH).unwrap_or_else(|e| {
+        panic!("Failed to load config: {}", e.to_string());
+    });
     let key = hash(conf.dump_password.as_bytes());
     let aes = crypto::AES::new(&key);
-    let storage = Storage::new(conf.dump_path, aes)?;
+    let storage = Storage::new(conf.dump_path, aes).unwrap_or_else(|e| {
+        panic!("Failed to initialize storage: {}", e.to_string());
+    });
     let executor = executor::Executor::new(storage).await;
-    WsServer::new(&conf.bind, conf.password, executor).await?;
-
-    Ok(())
+    WsServer::new(&conf.bind, conf.password, executor)
+        .await
+        .unwrap_or_else(|e| {
+            panic!("Failed to start WebSocket server: {}", e.to_string());
+        });
 }
 #[derive(thiserror::Error, Debug)]
 pub enum Error {

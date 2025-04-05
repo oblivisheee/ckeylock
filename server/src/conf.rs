@@ -12,12 +12,30 @@ pub struct Config {
 
 impl Config {
     pub fn from_toml(path: &str) -> Result<Self, ConfigError> {
-        let data = std::fs::read_to_string(path)?;
+        let data = match std::fs::read_to_string(path) {
+            Ok(data) => data,
+            Err(e) => {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    return Err(ConfigError::NotFound);
+                } else {
+                    return Err(ConfigError::Fs(e));
+                }
+            }
+        };
         let config: Config = toml::from_str(&data)?;
         Ok(config)
     }
     pub fn from_ron(path: &str) -> Result<Self, ConfigError> {
-        let data = std::fs::read_to_string(path)?;
+        let data = match std::fs::read_to_string(path) {
+            Ok(data) => data,
+            Err(e) => {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    return Err(ConfigError::NotFound);
+                } else {
+                    return Err(ConfigError::Fs(e));
+                }
+            }
+        };
         let config: Config = ron::from_str(&data)?;
         Ok(config)
     }
@@ -36,4 +54,6 @@ pub enum ConfigError {
     Toml(#[from] toml::de::Error),
     #[error("RON parse error: {0}")]
     Ron(#[from] ron::de::SpannedError),
+    #[error("Config not found")]
+    NotFound,
 }
