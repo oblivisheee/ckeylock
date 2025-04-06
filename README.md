@@ -46,6 +46,11 @@ To use CKeyLock in your project follow these steps:
     ```
 4. Use!
 
+## Install via Docker
+``bash
+docker pull ghcr.io/oblivisheee/ckeylock:v1
+``
+
 ## Contributing
 
 We welcome contributions! Feel free to submit issues or pull requests to help improve CKeyLock.
