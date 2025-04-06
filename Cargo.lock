@@ -209,7 +209,7 @@ dependencies = [
 
 [[package]]
 name = "ckeylock"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "aes-gcm",
  "bincode",
@@ -235,7 +235,7 @@ dependencies = [
 
 [[package]]
 name = "ckeylock-api"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "ckeylock-core 0.1.1",
  "futures-util",
@@ -258,7 +258,7 @@ dependencies = [
 
 [[package]]
 name = "ckeylock-core"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "serde",
  "serde_json",

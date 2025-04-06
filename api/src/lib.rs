@@ -26,7 +26,7 @@ impl CKeyLockAPI {
         }
     }
 
-    pub async fn connect(&self) -> Result<CKeyLockConnection, Box<dyn std::error::Error>> {
+    pub async fn connect(&self) -> Result<CKeyLockConnection, Error> {
         let url = format!("ws://{}", self.bind);
         let request = match &self.password {
             Some(password) => ClientRequestBuilder::new(Uri::from_str(&url)?)
@@ -144,6 +144,8 @@ pub enum Error {
     WsError(#[from] WsError),
     #[error("Wrong response format")]
     WrongResponseFormat,
+    #[error("Failed to parse uri: {0}")]
+    UriParseError(#[from] tokio_tungstenite::tungstenite::http::uri::InvalidUri),
     #[error("{0}")]
     Custom(String),
 }
