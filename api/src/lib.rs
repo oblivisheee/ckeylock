@@ -3,6 +3,7 @@ use std::str::FromStr;
 use ckeylock_core::response::ErrorResponse;
 use ckeylock_core::{Request, RequestWrapper, Response};
 use futures_util::{SinkExt, StreamExt};
+use std::cell::RefCell;
 use thiserror::Error;
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::Error as WsError;
@@ -36,20 +37,23 @@ impl CKeyLockAPI {
         };
         let (ws_stream, _) = connect_async(request).await?;
 
-        Ok(CKeyLockConnection { ws_stream })
+        Ok(CKeyLockConnection {
+            ws_stream: RefCell::new(ws_stream),
+        })
     }
 }
 
 pub struct CKeyLockConnection {
-    ws_stream: WebSocketStream<MaybeTlsStream<TcpStream>>,
+    ws_stream: RefCell<WebSocketStream<MaybeTlsStream<TcpStream>>>,
 }
 impl CKeyLockConnection {
-    async fn send_request(&mut self, request: Request) -> Result<Response, Error> {
+    async fn send_request(&self, request: Request) -> Result<Response, Error> {
         let wrapper = RequestWrapper::new(request);
-        self.ws_stream
+        let mut ws_stream = self.ws_stream.borrow_mut();
+        ws_stream
             .send(request_into_message(wrapper.clone()))
             .await?;
-        while let Some(msg) = self.ws_stream.next().await {
+        while let Some(msg) = ws_stream.next().await {
             let msg = msg?;
             if let Message::Text(text) = msg {
                 if let Ok(response) = serde_json::from_str::<Response>(&text) {
@@ -129,8 +133,9 @@ impl CKeyLockConnection {
             Err(Error::WrongResponseFormat)
         }
     }
-    pub async fn close(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        Ok(self.ws_stream.close(None).await?)
+    pub async fn close(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let mut ws_stream = self.ws_stream.borrow_mut();
+        Ok(ws_stream.close(None).await?)
     }
 }
 
@@ -155,7 +160,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_set() {
-        let api = CKeyLockAPI::new("127.0.0.1:8080", Some("helloworld"));
+        let api = CKeyLockAPI::new(
+            "127.0.0.1:8080",
+            Some(
+                "4f69e5532544b557dcee8dd077318f353af4ebcbed3280c8a9ceaa337ed45d283f9a7c9faebfb0c476a92e07a47c28bc603a93c74c090d41b3d625ea35902f35",
+            ),
+        );
         let mut connection = api.connect().await.unwrap();
 
         let key = b"popa".to_vec();
