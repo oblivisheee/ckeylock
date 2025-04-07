@@ -235,7 +235,7 @@ dependencies = [
 
 [[package]]
 name = "ckeylock-api"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "ckeylock-core 0.1.1",
  "futures-util",
