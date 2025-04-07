@@ -71,7 +71,7 @@ impl CKeyLockConnection {
             "Response with matching ID not found".to_string(),
         ))
     }
-    pub async fn set(&mut self, key: Vec<u8>, value: Vec<u8>) -> Result<Vec<u8>, Error> {
+    pub async fn set(&self, key: Vec<u8>, value: Vec<u8>) -> Result<Vec<u8>, Error> {
         let res = self.send_request(Request::Set { key, value }).await?;
         if let Some(ckeylock_core::ResponseData::SetResponse { key }) = res.data() {
             Ok(key.to_vec())
@@ -80,7 +80,7 @@ impl CKeyLockConnection {
         }
     }
 
-    pub async fn get(&mut self, key: Vec<u8>) -> Result<Option<Vec<u8>>, Error> {
+    pub async fn get(&self, key: Vec<u8>) -> Result<Option<Vec<u8>>, Error> {
         let res = self.send_request(Request::Get { key }).await?;
         if let Some(ckeylock_core::ResponseData::GetResponse { value }) = res.data() {
             Ok(value.as_ref().map(|v| v.to_vec()))
@@ -89,7 +89,7 @@ impl CKeyLockConnection {
         }
     }
 
-    pub async fn delete(&mut self, key: Vec<u8>) -> Result<Option<Vec<u8>>, Error> {
+    pub async fn delete(&self, key: Vec<u8>) -> Result<Option<Vec<u8>>, Error> {
         let res = self.send_request(Request::Delete { key }).await?;
         if let Some(ckeylock_core::ResponseData::DeleteResponse { key }) = res.data() {
             Ok(key.as_ref().map(|v| v.to_vec()))
@@ -98,7 +98,7 @@ impl CKeyLockConnection {
         }
     }
 
-    pub async fn list(&mut self) -> Result<Vec<Vec<u8>>, Error> {
+    pub async fn list(&self) -> Result<Vec<Vec<u8>>, Error> {
         let res = self.send_request(Request::List).await?;
         if let Some(ckeylock_core::ResponseData::ListResponse { keys }) = res.data() {
             Ok(keys.clone())
@@ -107,7 +107,7 @@ impl CKeyLockConnection {
         }
     }
 
-    pub async fn exists(&mut self, key: Vec<u8>) -> Result<bool, Error> {
+    pub async fn exists(&self, key: Vec<u8>) -> Result<bool, Error> {
         let res = self.send_request(Request::Exists { key }).await?;
         if let Some(ckeylock_core::ResponseData::ExistsResponse { exists }) = res.data() {
             Ok(*exists)
@@ -116,7 +116,7 @@ impl CKeyLockConnection {
         }
     }
 
-    pub async fn count(&mut self) -> Result<usize, Error> {
+    pub async fn count(&self) -> Result<usize, Error> {
         let res = self.send_request(Request::Count).await?;
         if let Some(ckeylock_core::ResponseData::CountResponse { count }) = res.data() {
             Ok(*count)
@@ -125,7 +125,7 @@ impl CKeyLockConnection {
         }
     }
 
-    pub async fn clear(&mut self) -> Result<(), Error> {
+    pub async fn clear(&self) -> Result<(), Error> {
         let res = self.send_request(Request::Clear).await?;
         if let Some(ckeylock_core::ResponseData::ClearResponse) = res.data() {
             Ok(())
