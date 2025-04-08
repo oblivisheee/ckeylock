@@ -1,20 +1,23 @@
 use crate::crypto::{AES, hash};
-
-use bincode::{de, error};
 use dashmap::DashMap;
+use lru::LruCache;
+use std::sync::PoisonError;
 use std::{
     fs::{File, OpenOptions},
-    io::{BufReader, Read, Seek as _, Write},
+    io::{BufReader, BufWriter, Read, Seek as _, SeekFrom, Write},
     path::Path,
 };
 use thiserror::Error;
+use tokio::sync::{Mutex, MutexGuard};
 use tracing::{debug, error, info, warn};
 
+const LRU_CACHE_SIZE: usize = 100;
 pub struct Storage {
-    data: DashMap<Vec<u8>, Vec<u8>>,
+    data: Box<DashMap<Vec<u8>, Vec<u8>>>,
     file: File,
     aes: AES,
     checksum: Vec<u8>,
+    cache: Mutex<LruCache<Vec<u8>, Vec<u8>>>,
 }
 
 impl Storage {
@@ -44,10 +47,13 @@ impl Storage {
         file.write_all(&encrypted_content)?;
         info!("Empty storage created successfully.");
         Ok(Self {
-            data: dashmap,
+            data: Box::new(dashmap),
             file,
             aes,
             checksum: checksum.to_vec(),
+            cache: Mutex::new(LruCache::new(
+                std::num::NonZero::new(LRU_CACHE_SIZE).unwrap(),
+            )), // Initialize LRU cache with a capacity of 100
         })
     }
 
@@ -68,23 +74,33 @@ impl Storage {
             file,
             aes,
             checksum: checksum.to_vec(),
+            cache: Mutex::new(LruCache::new(
+                std::num::NonZero::new(LRU_CACHE_SIZE).unwrap(),
+            )),
         })
     }
 
     pub fn sync(&mut self) -> Result<(), StorageError> {
         debug!("Syncing storage to file.");
         let content = bincode::serde::encode_to_vec(&self.data, bincode::config::standard())?;
-        let checksum = hash(&content).to_vec();
-        if checksum != self.checksum {
+        let new_checksum = hash(&content).to_vec();
+
+        if new_checksum != self.checksum {
             let encrypted_content = self
                 .aes
                 .encrypt(&content, None)
                 .map_err(StorageError::Aes)?;
-            self.file.set_len(0)?;
-            self.file.seek(std::io::SeekFrom::Start(0))?;
-            self.file.write_all(&encrypted_content)?;
+
+            let file = &mut self.file;
+            file.set_len(0)?;
+            file.seek(SeekFrom::Start(0))?;
+            let mut writer = BufWriter::new(file);
+            writer.write_all(&encrypted_content)?;
+            writer.flush()?;
+            drop(writer);
             self.file.sync_all()?;
-            self.checksum = checksum;
+
+            self.checksum = new_checksum;
             info!("Storage synced successfully.");
         } else {
             debug!("No changes detected, skipping sync.");
@@ -92,22 +108,28 @@ impl Storage {
         Ok(())
     }
 
-    pub fn set(&mut self, key: Vec<u8>, value: Vec<u8>) -> Result<Vec<u8>, StorageError> {
+    pub async fn set(&mut self, key: Vec<u8>, value: Vec<u8>) -> Result<Vec<u8>, StorageError> {
         debug!(
             "Setting key: {:?} with value of length: {}",
             hex::encode(&key),
             value.len()
         );
-        self.data.insert(key.clone(), value);
-        self.sync()?;
+        self.data.insert(key.clone(), value.clone());
+        self.cache.lock().await.put(key.clone(), value.clone());
         info!("Key {:?} set successfully.", hex::encode(&key));
         Ok(key)
     }
 
-    pub fn get(&self, key: Vec<u8>) -> Result<Option<Vec<u8>>, StorageError> {
+    pub async fn get(&self, key: Vec<u8>) -> Result<Option<Vec<u8>>, StorageError> {
         debug!("Getting value for key: {:?}", hex::encode(&key));
+        if let Some(value) = self.cache.lock().await.get(&key) {
+            info!("Cache hit for key: {:?}", hex::encode(&key));
+            return Ok(Some(value.clone()));
+        }
+        // Fallback to DashMap
         let value = self.data.get(&key).map(|v| v.clone());
-        if value.is_some() {
+        if let Some(ref v) = value {
+            self.cache.lock().await.put(key.clone(), v.clone()); // Update cache
             info!("Key {:?} found.", hex::encode(&key));
         } else {
             warn!("Key {:?} not found.", hex::encode(&key));
@@ -115,9 +137,10 @@ impl Storage {
         Ok(value)
     }
 
-    pub fn delete(&mut self, key: Vec<u8>) -> Result<Option<Vec<u8>>, StorageError> {
+    pub async fn delete(&mut self, key: Vec<u8>) -> Result<Option<Vec<u8>>, StorageError> {
         debug!("Deleting key: {:?}", hex::encode(&key));
-        let value = self.data.remove(&key).map(|v| v.clone()).map(|(k, v)| k);
+        self.cache.lock().await.pop(&key);
+        let value = self.data.remove(&key).map(|v| v.clone()).map(|(k, _)| k);
         self.sync()?;
         if value.is_some() {
             info!("Key {:?} deleted successfully.", hex::encode(&key));
@@ -152,9 +175,10 @@ impl Storage {
         Ok(count)
     }
 
-    pub fn clear(&mut self) -> Result<(), StorageError> {
+    pub async fn clear(&mut self) -> Result<(), StorageError> {
         debug!("Clearing all keys in storage.");
         self.data.clear();
+        self.cache.lock().await.clear();
         self.sync()?;
         info!("Storage cleared successfully.");
         Ok(())

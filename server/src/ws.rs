@@ -1,5 +1,3 @@
-use crate::executor;
-
 use crate::{Error, executor::Executor};
 use futures_util::{SinkExt, StreamExt};
 use std::sync::Arc;

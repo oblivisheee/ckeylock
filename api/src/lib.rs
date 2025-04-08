@@ -160,16 +160,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_set() {
-        let api = CKeyLockAPI::new(
-            "127.0.0.1:8080",
-            Some(
-                "4f69e5532544b557dcee8dd077318f353af4ebcbed3280c8a9ceaa337ed45d283f9a7c9faebfb0c476a92e07a47c28bc603a93c74c090d41b3d625ea35902f35",
-            ),
-        );
+        let api = CKeyLockAPI::new("127.0.0.1:8080", Some("helloworld"));
         let mut connection = api.connect().await.unwrap();
 
         let key = b"popa".to_vec();
-        let value = b"pisya".to_vec();
+        let value = b"pizdec".to_vec();
 
         let result = connection.set(key.clone(), value.clone()).await;
         assert!(result.is_ok());
@@ -229,7 +224,7 @@ mod tests {
         let api = CKeyLockAPI::new("127.0.0.1:8080", Some("helloworld"));
         let mut connection = api.connect().await.unwrap();
         let key = b"popa".to_vec();
-        let res = connection.get(key.clone()).await.unwrap();
-        println!("Response: {:?}", res.unwrap());
+        let res = connection.list().await.unwrap();
+        println!("Response: {:?}", res);
     }
 }

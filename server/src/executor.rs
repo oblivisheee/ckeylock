@@ -1,6 +1,5 @@
 use crate::{Error, storage::Storage};
 use ckeylock_core::{Request, Response, ResponseData, request::RequestWrapper};
-use serde_json::value;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tracing::error;
@@ -18,19 +17,19 @@ impl Executor {
                     Some(cmd) = rx.recv() => {
                         match cmd{
                             ExecutorCommands::Set { key, value, respond_to } => {
-                                let result = storage.set(key, value);
+                                let result = storage.set(key, value).await;
                                 if let Err(e) = respond_to.send(result.map_err(|e| e.into())){
                                     error!("Failed to send set response: {:?}", e);
                                 }
                             }
                             ExecutorCommands::Get { key, response } => {
-                                let result = storage.get(key);
+                                let result = storage.get(key).await;
                                 if let Err(e) = response.send(result.map_err(|e| e.into())){
                                     error!("Failed to send get response: {:?}", e);
                                 }
                             }
                             ExecutorCommands::Delete { key, response } => {
-                                let result = storage.delete(key);
+                                let result = storage.delete(key).await;
                                 if let Err(e) = response.send(result.map_err(|e| e.into())){
                                     error!("Failed to send delete response: {:?}", e);
                                 }
@@ -54,7 +53,7 @@ impl Executor {
                                 }
                             }
                             ExecutorCommands::Clear { response } => {
-                                let result = storage.clear();
+                                let result = storage.clear().await;
                                 if let Err(e) = response.send(result.map_err(|e| e.into())){
                                  error!("Failed to send clear response: {:?}", e);
 
@@ -120,7 +119,7 @@ impl Executor {
                 ))
             }
             Request::Clear => {
-                let result = self.clear().await;
+                self.clear().await?;
                 Ok(Response::new(
                     Some(ResponseData::ClearResponse),
                     "Cleared successfully.",
