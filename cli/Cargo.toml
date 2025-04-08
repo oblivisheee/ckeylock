@@ -1,0 +1,13 @@
+[package]
+name = "ckeylock-cli"
+version = "0.1.0"
+edition.workspace = true
+readme.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+
+ckeylock-api = "0.1.5"
+clap = { version = "4.5.35", features = ["derive"] }
+tokio = { version = "1.44.2", features = ["rt", "rt-multi-thread", "macros"] }
