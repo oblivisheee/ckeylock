@@ -1,14 +1,13 @@
 use crate::crypto::{AES, hash};
 use dashmap::DashMap;
 use lru::LruCache;
-use std::sync::PoisonError;
 use std::{
     fs::{File, OpenOptions},
     io::{BufReader, BufWriter, Read, Seek as _, SeekFrom, Write},
     path::Path,
 };
 use thiserror::Error;
-use tokio::sync::{Mutex, MutexGuard};
+use tokio::sync::Mutex;
 use tracing::{debug, error, info, warn};
 
 const LRU_CACHE_SIZE: usize = 100;
