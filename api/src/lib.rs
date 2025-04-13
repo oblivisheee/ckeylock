@@ -3,9 +3,10 @@ use std::str::FromStr;
 use ckeylock_core::response::ErrorResponse;
 use ckeylock_core::{Request, RequestWrapper, Response};
 use futures_util::{SinkExt, StreamExt};
-use std::cell::RefCell;
+use std::sync::Arc;
 use thiserror::Error;
 use tokio::net::TcpStream;
+use tokio::sync::Mutex;
 use tokio_tungstenite::tungstenite::Error as WsError;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest as _;
 use tokio_tungstenite::{
@@ -17,9 +18,8 @@ pub struct CKeyLockAPI {
     bind: String,
     password: Option<String>,
 }
+
 impl CKeyLockAPI {
-    /// Creates a new instance of `CKeyLockAPI` with the given bind address.
-    /// The bind address should be in the format "host:port".
     pub fn new(bind: &str, password: Option<&str>) -> Self {
         CKeyLockAPI {
             bind: bind.to_owned(),
@@ -32,45 +32,64 @@ impl CKeyLockAPI {
         let request = match &self.password {
             Some(password) => ClientRequestBuilder::new(Uri::from_str(&url)?)
                 .with_header("Authorization", password)
-                .into_client_request()?,
-            None => url.into_client_request()?,
+                .into_client_request()
+                .map_err(|e| Error::Custom(format!("Failed to build client request: {}", e)))?,
+            None => url
+                .into_client_request()
+                .map_err(|e| Error::Custom(format!("Failed to build client request: {}", e)))?,
         };
-        let (ws_stream, _) = connect_async(request).await?;
+        let (ws_stream, _) = connect_async(request)
+            .await
+            .map_err(|e| Error::Custom(format!("Failed to connect to WebSocket: {}", e)))?;
 
         Ok(CKeyLockConnection {
-            ws_stream: RefCell::new(ws_stream),
+            inner: CkeyLockConnectionInner::new(ws_stream).into(),
         })
     }
 }
 
 pub struct CKeyLockConnection {
-    ws_stream: RefCell<WebSocketStream<MaybeTlsStream<TcpStream>>>,
+    inner: Arc<CkeyLockConnectionInner>,
 }
+
 impl CKeyLockConnection {
     async fn send_request(&self, request: Request) -> Result<Response, Error> {
-        let wrapper = RequestWrapper::new(request);
-        let mut ws_stream = self.ws_stream.borrow_mut();
-        ws_stream
-            .send(request_into_message(wrapper.clone()))
+        let request = RequestWrapper::new(request);
+
+        self.inner
+            .send(request_into_message(request.clone()))
             .await?;
-        while let Some(msg) = ws_stream.next().await {
-            let msg = msg?;
-            if let Message::Text(text) = msg {
-                if let Ok(response) = serde_json::from_str::<Response>(&text) {
-                    if response.reqid() == wrapper.id() {
-                        return Ok(response);
-                    }
-                } else if let Ok(err_response) = serde_json::from_str::<ErrorResponse>(&text) {
-                    if err_response.reqid == wrapper.id() {
-                        return Err(Error::Custom(err_response.message));
-                    }
-                }
+
+        while let Some(msg) = self.inner.lock().await.next().await {
+            let msg =
+                msg.map_err(|e| Error::Custom(format!("Failed to receive message: {}", e)))?;
+            if let Some(parsed_response) = self.parse_response(&msg, request.id()) {
+                return parsed_response;
             }
         }
         Err(Error::Custom(
             "Response with matching ID not found".to_string(),
         ))
     }
+
+    fn parse_response(&self, msg: &Message, req_id: Vec<u8>) -> Option<Result<Response, Error>> {
+        if let Message::Text(text) = msg {
+            if let Ok(response) = serde_json::from_str::<Response>(text) {
+                if response.reqid() == req_id {
+                    return Some(Ok(response));
+                }
+            } else if let Ok(err_response) = serde_json::from_str::<ErrorResponse>(text) {
+                if err_response.reqid == req_id {
+                    return Some(Err(Error::Custom(format!(
+                        "Error response received: {}",
+                        err_response.message
+                    ))));
+                }
+            }
+        }
+        None
+    }
+
     pub async fn set(&self, key: Vec<u8>, value: Vec<u8>) -> Result<Vec<u8>, Error> {
         let res = self.send_request(Request::Set { key, value }).await?;
         if let Some(ckeylock_core::ResponseData::SetResponse { key }) = res.data() {
@@ -133,14 +152,41 @@ impl CKeyLockConnection {
             Err(Error::WrongResponseFormat)
         }
     }
+
     pub async fn close(&self) -> Result<(), Box<dyn std::error::Error>> {
-        let mut ws_stream = self.ws_stream.borrow_mut();
-        Ok(ws_stream.close(None).await?)
+        self.inner
+            .lock()
+            .await
+            .close(None)
+            .await
+            .map_err(|e| Box::new(Error::Custom(format!("Failed to close WebSocket: {}", e))) as _)
     }
 }
 
 fn request_into_message(req: ckeylock_core::RequestWrapper) -> Message {
     Message::Text(req.to_string().into())
+}
+
+pub struct CkeyLockConnectionInner(Mutex<WebSocketStream<MaybeTlsStream<TcpStream>>>);
+
+impl CkeyLockConnectionInner {
+    pub fn new(ws_stream: WebSocketStream<MaybeTlsStream<TcpStream>>) -> Self {
+        CkeyLockConnectionInner(Mutex::new(ws_stream))
+    }
+
+    pub async fn send(&self, msg: Message) -> Result<(), Error> {
+        self.0
+            .lock()
+            .await
+            .send(msg)
+            .await
+            .map_err(|e| Error::Custom(format!("Failed to send message: {}", e)))
+    }
+    pub async fn lock(
+        &self,
+    ) -> tokio::sync::MutexGuard<'_, WebSocketStream<MaybeTlsStream<TcpStream>>> {
+        self.0.lock().await
+    }
 }
 
 #[derive(Error, Debug)]
@@ -160,8 +206,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_set() {
-        let api = CKeyLockAPI::new("127.0.0.1:8080", Some("helloworld"));
-        let mut connection = api.connect().await.unwrap();
+        let api = CKeyLockAPI::new("127.0.0.1:5830", Some("helloworld"));
+        let connection = api.connect().await.unwrap();
 
         let key = b"popa".to_vec();
         let value = b"pizdec".to_vec();
@@ -173,8 +219,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_get() {
-        let api = CKeyLockAPI::new("127.0.0.1:8080", Some("helloworld"));
-        let mut connection = api.connect().await.unwrap();
+        let api = CKeyLockAPI::new("127.0.0.1:5830", Some("helloworld"));
+        let connection = api.connect().await.unwrap();
 
         let key = b"test_key".to_vec();
         let value = b"test_value".to_vec();
@@ -189,8 +235,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete() {
-        let api = CKeyLockAPI::new("127.0.0.1:8080", Some("helloworld"));
-        let mut connection = api.connect().await.unwrap();
+        let api = CKeyLockAPI::new("127.0.0.1:5830", Some("helloworld"));
+        let connection = api.connect().await.unwrap();
 
         let key = b"test_key".to_vec();
         let value = b"test_value".to_vec();
@@ -203,8 +249,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_list() {
-        let api = CKeyLockAPI::new("127.0.0.1:8080", Some("helloworld"));
-        let mut connection = api.connect().await.unwrap();
+        let api = CKeyLockAPI::new("127.0.0.1:5830", Some("helloworld"));
+        let connection = api.connect().await.unwrap();
 
         let key1 = b"test_key1".to_vec();
         let key2 = b"test_key2".to_vec();
@@ -218,13 +264,5 @@ mod tests {
         let keys = result.unwrap();
         assert!(keys.contains(&key1));
         assert!(keys.contains(&key2));
-    }
-    #[tokio::test]
-    pub async fn req() {
-        let api = CKeyLockAPI::new("127.0.0.1:8080", Some("helloworld"));
-        let mut connection = api.connect().await.unwrap();
-        let key = b"popa".to_vec();
-        let res = connection.list().await.unwrap();
-        println!("Response: {:?}", res);
     }
 }

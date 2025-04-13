@@ -52,7 +52,7 @@ impl Storage {
             checksum: checksum.to_vec(),
             cache: Mutex::new(LruCache::new(
                 std::num::NonZero::new(LRU_CACHE_SIZE).unwrap(),
-            )), // Initialize LRU cache with a capacity of 100
+            )),
         })
     }
 
