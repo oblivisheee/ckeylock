@@ -28,6 +28,12 @@ impl Executor {
                                     error!("Failed to send get response: {:?}", e);
                                 }
                             }
+                            ExecutorCommands::BatchGet { keys, response } => {
+                                let result = storage.batch_get(keys).await;
+                                if let Err(e) = response.send(result.map_err(|e| e.into())){
+                                    error!("Failed to send batch get response: {:?}", e);
+                                }
+                            }
                             ExecutorCommands::Delete { key, response } => {
                                 let result = storage.delete(key).await;
                                 if let Err(e) = response.send(result.map_err(|e| e.into())){
@@ -75,6 +81,14 @@ impl Executor {
                 Ok(Response::new(
                     Some(ResponseData::SetResponse { key: result }),
                     "Stored successfully.",
+                    request.id(),
+                ))
+            }
+            Request::BatchGet { keys } => {
+                let result = self.batch_get(keys).await?;
+                Ok(Response::new(
+                    Some(ResponseData::BatchGetResponse { values: result }),
+                    "Batch retrieved successfully.",
                     request.id(),
                 ))
             }
@@ -146,6 +160,13 @@ impl Executor {
             .await?;
         rx.await?
     }
+    pub async fn batch_get(&self, keys: Vec<Vec<u8>>) -> Result<Vec<Option<Vec<u8>>>, Error> {
+        let (tx, rx) = oneshot::channel();
+        self.command_tx
+            .send(ExecutorCommands::BatchGet { keys, response: tx })
+            .await?;
+        rx.await?
+    }
     pub async fn delete(&self, key: Vec<u8>) -> Result<Option<Vec<u8>>, Error> {
         let (tx, rx) = oneshot::channel();
         self.command_tx
@@ -191,6 +212,10 @@ pub enum ExecutorCommands {
     Get {
         key: Vec<u8>,
         response: oneshot::Sender<Result<Option<Vec<u8>>, Error>>,
+    },
+    BatchGet {
+        keys: Vec<Vec<u8>>,
+        response: oneshot::Sender<Result<Vec<Option<Vec<u8>>>, Error>>,
     },
     Delete {
         key: Vec<u8>,

@@ -7,6 +7,7 @@ pub enum Request {
     List,
     Exists { key: Vec<u8> },
     Count,
+    BatchGet { keys: Vec<Vec<u8>> },
     Clear,
 }
 

@@ -53,5 +53,6 @@ pub enum ResponseData {
     ListResponse { keys: Vec<Vec<u8>> },
     ExistsResponse { exists: bool },
     CountResponse { count: usize },
+    BatchGetResponse { values: Vec<Option<Vec<u8>>> },
     ClearResponse,
 }

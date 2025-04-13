@@ -125,15 +125,35 @@ impl Storage {
             info!("Cache hit for key: {:?}", hex::encode(&key));
             return Ok(Some(value.clone()));
         }
-        // Fallback to DashMap
+
         let value = self.data.get(&key).map(|v| v.clone());
         if let Some(ref v) = value {
-            self.cache.lock().await.put(key.clone(), v.clone()); // Update cache
+            self.cache.lock().await.put(key.clone(), v.clone());
             info!("Key {:?} found.", hex::encode(&key));
         } else {
             warn!("Key {:?} not found.", hex::encode(&key));
         }
         Ok(value)
+    }
+
+    pub async fn batch_get(
+        &self,
+        keys: Vec<Vec<u8>>,
+    ) -> Result<Vec<Option<Vec<u8>>>, StorageError> {
+        let mut results = Vec::with_capacity(keys.len());
+        let mut cache = self.cache.lock().await;
+        for key in keys {
+            if let Some(value) = cache.get(&key) {
+                results.push(Some(value.clone()));
+            } else if let Some(value) = self.data.get(&key) {
+                let val = value.clone();
+                cache.put(key.clone(), val.clone());
+                results.push(Some(val));
+            } else {
+                results.push(None);
+            }
+        }
+        Ok(results)
     }
 
     pub async fn delete(&mut self, key: Vec<u8>) -> Result<Option<Vec<u8>>, StorageError> {

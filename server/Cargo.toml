@@ -10,7 +10,7 @@ description = "A secure and fast secret manager"
 [dependencies]
 aes-gcm = "0.10.3"
 bincode = { version = "2.0.1", features = ["serde"] }
-ckeylock-core = "0.1.1"
+ckeylock-core = { path = "../core" } # "0.1.1"
 clap = { version = "4.5.35", features = ["derive"] }
 cryptostream = "0.3.2"
 dashmap = { version = "6.1.0", features = ["serde"] }
