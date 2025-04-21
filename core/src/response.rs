@@ -41,7 +41,7 @@ pub struct ErrorResponse {
 }
 impl ErrorResponse {
     pub fn to_string(&self) -> String {
-        serde_json::to_string(self).unwrap()
+        serde_json::to_string_pretty(self).unwrap()
     }
 }
 
@@ -53,5 +53,6 @@ pub enum ResponseData {
     ListResponse { keys: Vec<Vec<u8>> },
     ExistsResponse { exists: bool },
     CountResponse { count: usize },
+    BatchGetResponse { values: Vec<Option<Vec<u8>>> },
     ClearResponse,
 }

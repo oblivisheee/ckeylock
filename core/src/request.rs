@@ -7,6 +7,7 @@ pub enum Request {
     List,
     Exists { key: Vec<u8> },
     Count,
+    BatchGet { keys: Vec<Vec<u8>> },
     Clear,
 }
 
@@ -30,6 +31,6 @@ impl RequestWrapper {
         &self.req
     }
     pub fn to_string(&self) -> String {
-        serde_json::to_string(self).unwrap()
+        serde_json::to_string_pretty(self).unwrap()
     }
 }

@@ -107,7 +107,14 @@ impl CKeyLockConnection {
             Err(Error::WrongResponseFormat)
         }
     }
-
+    pub async fn batch_get(&self, keys: Vec<Vec<u8>>) -> Result<Vec<Option<Vec<u8>>>, Error> {
+        let res = self.send_request(Request::BatchGet { keys }).await?;
+        if let Some(ckeylock_core::ResponseData::BatchGetResponse { values }) = res.data() {
+            Ok(values.clone())
+        } else {
+            Err(Error::WrongResponseFormat)
+        }
+    }
     pub async fn delete(&self, key: Vec<u8>) -> Result<Option<Vec<u8>>, Error> {
         let res = self.send_request(Request::Delete { key }).await?;
         if let Some(ckeylock_core::ResponseData::DeleteResponse { key }) = res.data() {
@@ -264,5 +271,30 @@ mod tests {
         let keys = result.unwrap();
         assert!(keys.contains(&key1));
         assert!(keys.contains(&key2));
+    }
+    #[tokio::test]
+    async fn test_batch_get() {
+        let api = CKeyLockAPI::new("127.0.0.1:5830", Some("helloworld"));
+        let connection = api.connect().await.unwrap();
+
+        let key1 = b"batch_key1".to_vec();
+        let value1 = b"batch_value1".to_vec();
+        let key2 = b"batch_key2".to_vec();
+        let value2 = b"batch_value2".to_vec();
+        let key3 = b"batch_key3".to_vec();
+
+        connection.set(key1.clone(), value1.clone()).await.unwrap();
+        connection.set(key2.clone(), value2.clone()).await.unwrap();
+
+        let keys = vec![key1.clone(), key2.clone(), key3.clone()];
+        let result = connection.batch_get(keys).await;
+
+        assert!(result.is_ok());
+        let values = result.unwrap();
+        println!("Values: {:?}", values);
+        assert_eq!(values.len(), 3);
+        assert_eq!(values[0], Some(value1));
+        assert_eq!(values[1], Some(value2));
+        assert_eq!(values[2], None);
     }
 }
