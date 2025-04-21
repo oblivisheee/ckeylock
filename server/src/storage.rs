@@ -140,19 +140,27 @@ impl Storage {
         &self,
         keys: Vec<Vec<u8>>,
     ) -> Result<Vec<Option<Vec<u8>>>, StorageError> {
+        debug!("Batch getting values for {} keys.", keys.len());
         let mut results = Vec::with_capacity(keys.len());
         let mut cache = self.cache.lock().await;
+
         for key in keys {
+            debug!("Processing key: {:?}", hex::encode(&key));
             if let Some(value) = cache.get(&key) {
+                info!("Cache hit for key: {:?}", hex::encode(&key));
                 results.push(Some(value.clone()));
             } else if let Some(value) = self.data.get(&key) {
                 let val = value.clone();
                 cache.put(key.clone(), val.clone());
+                info!("Key {:?} found in storage.", hex::encode(&key));
                 results.push(Some(val));
             } else {
+                warn!("Key {:?} not found.", hex::encode(&key));
                 results.push(None);
             }
         }
+
+        info!("Batch get completed for {} keys.", results.len());
         Ok(results)
     }
 
