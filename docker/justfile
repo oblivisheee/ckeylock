@@ -1,0 +1,4 @@
+build:
+    docker build -t ghcr.io/oblivisheee/ckeylock:v1 .
+publish:
+    docker push ghcr.io/oblivisheee/ckeylock:v1
