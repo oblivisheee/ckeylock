@@ -16,6 +16,7 @@ impl WsServer {
         bind: &str,
         password: Option<String>,
         executor: Arc<Executor>,
+        concurrent_limit: Option<usize>,
     ) -> Result<Self, WsServerError> {
         info!("Starting WebSocket server on {}", bind);
         let listener = TcpListener::bind(bind).await?;
@@ -63,70 +64,103 @@ impl WsServer {
                             )));
                         }
                     }
-
                     debug!("WebSocket handshake successful");
                     Ok(res)
                 };
                 match accept_hdr_async(stream, callback).await {
                     Ok(stream) => {
                         info!("WebSocket connection established");
-                        let (mut write, mut read) = stream.split();
-                        while let Some(Ok(message)) = read.next().await {
-                            match message {
-                                Message::Text(text) => {
-                                    debug!("Received text message.");
-                                    let request = match serde_json::from_str::<
-                                        ckeylock_core::RequestWrapper,
-                                    >(&text)
-                                    {
-                                        Ok(request) => request,
+                        let (write, read) = stream.split();
+                        let write = Arc::new(tokio::sync::Mutex::new(write));
+                        let executor = Arc::clone(&executor);
+
+                        read.for_each_concurrent(concurrent_limit, {
+                            let write = Arc::clone(&write);
+                            let executor = Arc::clone(&executor);
+                            move |msg| {
+                                let write = Arc::clone(&write);
+                                let executor = Arc::clone(&executor);
+                                async move {
+                                    let message = match msg {
+                                        Ok(m) => m,
                                         Err(e) => {
-                                            error!("Failed to parse request: {:?}", e);
-                                            if let Err(e) = write
-                                                .send(Message::Text(e.to_string().into()))
-                                                .await
-                                            {
-                                                error!("Failed to send error response: {:?}", e);
-                                            }
-                                            continue;
+                                            error!("WebSocket error: {:?}", e);
+                                            return;
                                         }
                                     };
-                                    match executor.execute(request.clone()).await {
-                                        Ok(response) => {
-                                            debug!("Request executed successfully");
-                                            if let Err(e) =
-                                                write.send(response_into_message(response)).await
-                                            {
-                                                error!("Failed to send response: {:?}", e);
+                                    match message {
+                                        Message::Text(text) => {
+                                            debug!("Received text message.");
+                                            let request = match serde_json::from_str::<
+                                                ckeylock_core::RequestWrapper,
+                                            >(
+                                                &text
+                                            ) {
+                                                Ok(request) => request,
+                                                Err(e) => {
+                                                    error!("Failed to parse request: {:?}", e);
+                                                    let mut write = write.lock().await;
+                                                    if let Err(e) = write
+                                                        .send(Message::Text(e.to_string().into()))
+                                                        .await
+                                                    {
+                                                        error!(
+                                                            "Failed to send error response: {:?}",
+                                                            e
+                                                        );
+                                                    }
+                                                    return;
+                                                }
+                                            };
+                                            let response = executor.execute(request.clone()).await;
+                                            let mut write = write.lock().await;
+                                            match response {
+                                                Ok(response) => {
+                                                    debug!("Request executed successfully");
+                                                    if let Err(e) = write
+                                                        .send(response_into_message(response))
+                                                        .await
+                                                    {
+                                                        error!("Failed to send response: {:?}", e);
+                                                    }
+                                                }
+                                                Err(e) => {
+                                                    error!("Request execution failed: {:?}", e);
+                                                    if let Err(e) = write
+                                                        .send(error_into_message(e, request.id()))
+                                                        .await
+                                                    {
+                                                        error!(
+                                                            "Failed to send error response: {:?}",
+                                                            e
+                                                        );
+                                                    }
+                                                }
                                             }
                                         }
-                                        Err(e) => {
-                                            error!("Request execution failed: {:?}", e);
-                                            if let Err(e) = write
-                                                .send(error_into_message(e, request.id()))
-                                                .await
-                                            {
-                                                error!("Failed to send error response: {:?}", e);
+                                        Message::Ping(ping) => {
+                                            debug!("Received ping, sending pong");
+                                            let mut write = write.lock().await;
+                                            if let Err(e) = write.send(Message::Pong(ping)).await {
+                                                error!("Failed to send pong: {:?}", e);
                                             }
                                         }
+                                        Message::Close(close) => {
+                                            debug!("Received close message: {:?}", close);
+                                            let mut write = write.lock().await;
+                                            if let Err(e) = write.send(Message::Close(close)).await
+                                            {
+                                                error!("Failed to send close message: {:?}", e);
+                                            }
+                                        }
+                                        _ => {
+                                            debug!("Received unsupported message type");
+                                        }
                                     }
-                                }
-                                Message::Ping(ping) => {
-                                    debug!("Received ping, sending pong");
-                                    write.send(Message::Pong(ping)).await.unwrap();
-                                }
-                                Message::Close(close) => {
-                                    debug!("Received close message: {:?}", close);
-                                    if let Err(e) = write.send(Message::Close(close)).await {
-                                        error!("Failed to send close message: {:?}", e);
-                                    }
-                                    break;
-                                }
-                                _ => {
-                                    debug!("Received unsupported message type");
                                 }
                             }
-                        }
+                        })
+                        .await;
                     }
                     Err(e) => {
                         error!("Error during WebSocket handshake: {:?}", e);

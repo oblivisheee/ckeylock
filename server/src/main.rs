@@ -8,6 +8,8 @@ use clap::Parser;
 use conf::Config;
 use crypto::hash;
 use storage::Storage;
+use tokio::select;
+use tokio::signal;
 use ws::WsServer;
 
 #[derive(Parser, Debug)]
@@ -40,12 +42,26 @@ async fn main() {
         panic!("Failed to initialize storage: {}", e.to_string());
     });
     let executor = executor::Executor::new(storage).await;
-    WsServer::new(&conf.bind, conf.password, executor)
-        .await
-        .unwrap_or_else(|e| {
-            panic!("Failed to start WebSocket server: {}", e.to_string());
-        });
+
+    let ws_server = WsServer::new(&conf.bind, conf.password, executor, conf.workers);
+
+    let mut sigterm = signal::unix::signal(signal::unix::SignalKind::terminate()).unwrap();
+
+    select! {
+        res = ws_server => {
+            res.unwrap_or_else(|e| {
+                panic!("Failed to start WebSocket server: {}", e.to_string());
+            });
+        }
+        _ = signal::ctrl_c() => {
+            tracing::info!("Received SIGINT (Ctrl+C), shutting down.");
+        }
+        _ = sigterm.recv() => {
+            tracing::info!("Received SIGTERM, shutting down.");
+        }
+    }
 }
+
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("Config error: {0}")]

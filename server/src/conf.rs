@@ -6,6 +6,7 @@ pub struct Config {
     pub password: Option<String>,
     pub dump_password: String,
     pub dump_path: String,
+    pub workers: Option<usize>,
 }
 
 impl Config {

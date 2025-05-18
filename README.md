@@ -22,6 +22,7 @@ To get started with CKeyLock, follow the instructions below:
     password = "helloworld"
     dump_path = "dump-clok.bin"
     dump_password = "helloworld"
+    workers = 10
     ```
 4. Run the application:
     ```bash
